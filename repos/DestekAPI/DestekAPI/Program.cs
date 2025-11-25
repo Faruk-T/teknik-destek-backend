@@ -8,49 +8,28 @@ using DestekAPI.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Connection string’i alıyoruz
+// 1. Veritabanı Bağlantısı
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-// JWT Ayarlarını al
+// 2. JWT Ayarlarını al (Hata düzeltmesi: ?? ile yedek anahtar eklendi)
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
+string keyString = jwtSettings["Key"] ?? "Bu_Varsayilan_Guvenli_Olmayan_Bir_Yedek_Anahtardir_Lutfen_Degistiriniz_123";
+var key = Encoding.UTF8.GetBytes(keyString);
 
-// Sunucuyu tüm ağdan erişilebilir yap
-builder.WebHost.UseUrls("http://0.0.0.0:5106");
+// Sunucuyu tüm ağdan erişilebilir yap (Gerekirse başındaki // işaretini kaldır)
+// builder.WebHost.UseUrls("http://0.0.0.0:5106");
 
-// CORS ayarları (React ve SignalR için uyumlu)
+// 3. GLOBAL CORS AYARLARI
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins(
-    "http://localhost:3000",
-    "http://192.168.1.66:3000",
-    "http://192.168.1.14:3000",
-    "http://192.168.1.20:3000",
-    "http://192.168.1.99:3000",
-    "http://10.172.110.157:3000",
-    "http://192.168.1.195:3000",
-    "http://192.168.1.20:5106",
-    "http://192.168.1.35:3000",
-    "http://192.168.0.10:3000",
-    "http://192.168.1.72:3000",
-    "http://192.168.1.35:3000",
-    "http://localhost:3001",
-    "http://192.168.1.66:3001",
-    "http://localhost:3002",
-    "http://192.168.1.66:3002",
-    "http://192.168.1.65:3002",   // <-- Bunu ekle
-    "http://localhost:63401",
-    "http://192.168.1.66:63401"
-)
-
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials();
+        policy.SetIsOriginAllowed(origin => true) // Tüm sitelere izin ver
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // SignalR ve Token için gerekli
     });
 });
-
 
 builder.Services.AddAuthentication(options =>
 {
@@ -71,12 +50,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// DbContext’i servis olarak ekliyoruz
+// DbContext Servisi
 builder.Services.AddDbContext<DestekDbContext>(options =>
     options.UseSqlServer(connectionString));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Swagger Ayarları
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "DestekAPI", Version = "v1" });
@@ -104,23 +85,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// SignalR servisini ekle
+// SignalR Servisi
 builder.Services.AddSignalR();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// HTTP Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-//app.UseHttpsRedirection();
-
 app.UseRouting();
 
-app.UseCors();
+// CORS'u Aktif Et
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
